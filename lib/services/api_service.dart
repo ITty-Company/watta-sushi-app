@@ -12,7 +12,7 @@ import '../models/user.dart';
 class ApiService {
   // Base URL of the existing backend. Modify this if your API is hosted
   // elsewhere or on another port.
-  static const String baseUrl = 'http://127.0.0.1:5050';
+  final String baseUrl = 'https://watta-sushi-9qfh.onrender.com';
 
   String? _token;
 
@@ -39,8 +39,9 @@ class ApiService {
 
   /// Retrieves all product categories from the API.
   Future<List<Category>> getCategories() async {
+    // Меняем путь на тот, который точно работает для веб-витрины
     final response = await http.get(
-      Uri.parse('$baseUrl/api/categories'),
+      Uri.parse('$baseUrl/api/shop/menu'), 
       headers: _headers(),
     );
     if (response.statusCode == 200) {
@@ -50,7 +51,7 @@ class ApiService {
       throw Exception('Failed to load categories');
     }
   }
-
+  
   /// Retrieves products. Optionally filter by category slug.
   Future<List<Product>> getProducts({String? categorySlug}) async {
     final uri = categorySlug == null

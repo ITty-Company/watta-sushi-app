@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import '../models/product.dart';
 import '../providers/cart_provider.dart';
 import '../providers/products_provider.dart';
-
+import '../providers/language_provider.dart'; // <-- Добавили импорт языка
+import '../i18n/translations.g.dart';
+import '../services/api_service.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -16,14 +18,18 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Load categories and products on mount
-    final productsProvider =
-        Provider.of<ProductsProvider>(context, listen: false);
-    productsProvider.loadCategories();
+    // Оборачиваем вызов в PostFrameCallback
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final productsProvider = Provider.of<ProductsProvider>(context, listen: false);
+      productsProvider.loadCategories();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    // <-- Получаем текущий язык для категорий
+    final currentLang = context.watch<LanguageProvider>().language; 
+
     return Consumer<ProductsProvider>(
       builder: (context, provider, _) {
         if (provider.isLoading && provider.categories.isEmpty) {
@@ -57,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       child: Center(
                         child: Text(
-                          category.name,
+                          category.getName(currentLang), // <-- Изменили
                           style: TextStyle(
                             color:
                                 selected ? Colors.white : Colors.black,
@@ -98,64 +104,157 @@ class ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cart = Provider.of<CartProvider>(context, listen: false);
+    final currentLang = context.watch<LanguageProvider>().language;
+    final baseUrl = Provider.of<ApiService>(context, listen: false).baseUrl;
+    String? getFullImageUrl(String? path) {
+      if (path == null || path.isEmpty) return null;
+      if (path.startsWith('http')) return path; // Если ссылка уже полная (например, с внешнего ресурса)
+      return '$baseUrl$path'; // Склеиваем домен и путь
+    }
+    final imageUrl = getFullImageUrl(product.imageUrl);
+
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Placeholder for product image
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(8),
-                image: product.imageUrl.isNotEmpty
-                    ? DecorationImage(
-                        image: NetworkImage(product.imageUrl),
-                        fit: BoxFit.cover,
-                      )
-                    : null,
-              ),
+            // Картинка товара с бейджами поверх неё
+            Stack(
+              children: [
+                Container(
+                  width: 90,
+                  height: 90,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                    image: imageUrl != null 
+                        ? DecorationImage(
+                            image: NetworkImage(imageUrl),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
+                  ),
+                ),
+                // Бейдж "ХІТ" (isPopular)
+                if (product.isPopular)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade400,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(12),
+                          bottomRight: Radius.circular(8),
+                        ),
+                      ),
+                      child: Text(
+                        t.popular, // <-- Берем слово "ХІТ" из твоих JSON-переводов!
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                // Бейдж скидки (promoDiscountPercent)
+                if (product.promoDiscountPercent > 0)
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(8),
+                          bottomRight: Radius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        '-${product.promoDiscountPercent}%',
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+              ],
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 16),
+            
+            // Информация о товаре
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    product.name,
+                    product.getName(currentLang),
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Text(
-                    product.description,
+                    product.getDescription(currentLang),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.grey),
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                   ),
-                  const SizedBox(height: 4),
-                  Text('${product.price.toStringAsFixed(2)}₴'),
+                  const SizedBox(height: 8),
+                  
+                  // Блок цены (со скидкой и без)
+                  Row(
+                    children: [
+                      if (product.promoDiscountPercent > 0) ...[
+                        // Старая зачеркнутая цена
+                        Text(
+                          '${product.price.toStringAsFixed(0)}₴',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            decoration: TextDecoration.lineThrough,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      // Актуальная цена
+                      Text(
+                        '${product.discountedPrice.toStringAsFixed(0)}₴',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: product.promoDiscountPercent > 0 ? Colors.redAccent : Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
-            IconButton(
-              onPressed: () {
-                cart.addProduct(product);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('${product.name} added to cart'),
-                    duration: const Duration(seconds: 1),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.add_shopping_cart),
-              color: Theme.of(context).colorScheme.primary,
+            
+            // Кнопка добавления в корзину
+            Align(
+              alignment: Alignment.bottomRight,
+              child: IconButton(
+                onPressed: () {
+                  cart.addProduct(product);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${product.getName(currentLang)} ${t.addToCart}'), // <-- "Додано" из переводов
+                      duration: const Duration(seconds: 1),
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.add_circle),
+                iconSize: 32,
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
           ],
         ),

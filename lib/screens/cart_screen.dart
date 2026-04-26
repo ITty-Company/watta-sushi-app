@@ -5,6 +5,7 @@ import '../models/cart_item.dart';
 import '../providers/cart_provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../providers/language_provider.dart'; // <-- Добавили импорт языка
 
 class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
@@ -57,7 +58,7 @@ class CartScreen extends StatelessWidget {
     final cart = context.read<CartProvider>();
     final auth = context.read<AuthProvider>();
     final apiService = context.read<ApiService>();
-    // Show a form dialog to collect customer info
+    
     final formKey = GlobalKey<FormState>();
     String customerName = '';
     String phone = '';
@@ -83,7 +84,7 @@ class CartScreen extends StatelessWidget {
                         : null,
                     onSaved: (value) => customerName = value ?? '',
                   ),
-                    TextFormField(
+                  TextFormField(
                     decoration: const InputDecoration(labelText: 'Phone'),
                     validator: (value) => value == null || value.isEmpty
                         ? 'Please enter your phone'
@@ -98,8 +99,7 @@ class CartScreen extends StatelessWidget {
                     onSaved: (value) => address = value ?? '',
                   ),
                   DropdownButtonFormField<String>(
-                    decoration:
-                        const InputDecoration(labelText: 'Payment method'),
+                    decoration: const InputDecoration(labelText: 'Payment method'),
                     initialValue: paymentMethod,
                     items: const [
                       DropdownMenuItem(
@@ -169,6 +169,9 @@ class CartItemTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cart = Provider.of<CartProvider>(context, listen: false);
+    // <-- Получаем текущий язык
+    final currentLang = context.watch<LanguageProvider>().language; 
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Padding(
@@ -182,9 +185,10 @@ class CartItemTile extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.grey.shade200,
                 borderRadius: BorderRadius.circular(8),
-                image: item.product.imageUrl.isNotEmpty
+                // <-- Безопасная проверка на null
+                image: item.product.imageUrl != null && item.product.imageUrl!.isNotEmpty
                     ? DecorationImage(
-                        image: NetworkImage(item.product.imageUrl),
+                        image: NetworkImage(item.product.imageUrl!), // <-- !
                         fit: BoxFit.cover,
                       )
                     : null,
@@ -196,7 +200,7 @@ class CartItemTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    item.product.name,
+                    item.product.getName(currentLang), // <-- Изменили
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                     ),

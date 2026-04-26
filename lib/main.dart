@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'i18n/translations.g.dart'; 
+import 'providers/language_provider.dart';
 
 import 'services/api_service.dart';
 import 'providers/auth_provider.dart';
@@ -12,10 +14,14 @@ import 'screens/login_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  LocaleSettings.useDeviceLocale();
+
   final apiService = ApiService();
   // Try to load saved token
   await apiService.loadToken();
-  runApp(MyApp(apiService: apiService));
+
+  runApp(TranslationProvider(child: MyApp(apiService: apiService)));
 }
 
 class MyApp extends StatelessWidget {
@@ -26,6 +32,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => LanguageProvider()),
         Provider<ApiService>.value(value: apiService),
         ChangeNotifierProvider(
           create: (_) => AuthProvider(apiService: apiService),
@@ -68,23 +75,24 @@ class _MainNavigationState extends State<MainNavigation> {
     ProfileScreen(),
   ];
 
-  final List<BottomNavigationBarItem> _items = const [
-    BottomNavigationBarItem(
-      icon: Icon(Icons.home),
-      label: 'Home',
-    ),
-    BottomNavigationBarItem(
-      icon: Icon(Icons.shopping_cart),
-      label: 'Cart',
-    ),
-    BottomNavigationBarItem(
-      icon: Icon(Icons.person),
-      label: 'Profile',
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    // Убрали const и перенесли список внутрь build
+    final List<BottomNavigationBarItem> _items = [
+      BottomNavigationBarItem(
+        icon: const Icon(Icons.home),
+        label: t.menu, // Используем t.menu вместо захардкоженного 'Home'
+      ),
+      BottomNavigationBarItem(
+        icon: const Icon(Icons.shopping_cart),
+        label: t.cart,
+      ),
+      BottomNavigationBarItem(
+        icon: const Icon(Icons.person),
+        label: t.profile,
+      ),
+    ];
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Watta Sushi'),
